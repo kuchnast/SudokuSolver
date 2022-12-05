@@ -1,4 +1,3 @@
-
 class Solver:
     DIMENSION = 9
     def __init__(self, sudoku_table):
@@ -6,6 +5,34 @@ class Solver:
         self.sudoku_cp = []
         for row in sudoku_table:
             self.sudoku_cp.append(row.copy())
+
+    def solve(self):
+        if not self._check_table_correct():
+            return False
+
+        i = 0
+        while i < self.DIMENSION:
+            j = 0
+            while j < self.DIMENSION:
+                while self.sudoku_table[i][j] == 0:
+                    self._set_position_value(i, j)
+                    while self.sudoku_table[i][j] == 0:
+                        i, j = self._get_last_empty_position(i, j)
+                        if i < 0 or j < 0:
+                            return False
+                        self._set_position_value(i, j)
+                j += 1
+            i += 1
+
+        return True
+
+    def _check_table_correct(self):
+        for i in range(self.DIMENSION):
+            for j in range(self.DIMENSION):
+                if self.sudoku_table[i][j] != 0 and not self._is_position_correct(i, j):
+                    return False
+        
+        return True
 
 
     def _check_row(self, row, column):
@@ -60,21 +87,3 @@ class Solver:
             row -= 1
 
         return row, column
-
-
-    def solve(self):
-        i = 0
-        while i < self.DIMENSION:
-            j = 0
-            while j < self.DIMENSION:
-                while self.sudoku_table[i][j] == 0:
-                    self._set_position_value(i, j)
-                    while self.sudoku_table[i][j] == 0:
-                        i, j = self._get_last_empty_position(i, j)
-                        if i < 0 or j < 0:
-                            return False
-                        self._set_position_value(i, j)
-                j += 1
-            i += 1
-
-        return True
