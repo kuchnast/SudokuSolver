@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 
-import solver
+from solver import Solver
 
 app = Flask(__name__)
 
@@ -10,9 +10,9 @@ def index():
 
 @app.route('/solve', methods=['POST'])
 def solve():
-    sudoku_table = request.get_json()
-    if solver.solve(sudoku_table):
-        return jsonify({"solution": sudoku_table})
+    solv = Solver(request.get_json())
+    if solv.solve():
+        return jsonify({"solution": solv.sudoku_table})
     else:
         return jsonify({"solution": "fail"})
 
