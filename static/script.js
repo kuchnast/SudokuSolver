@@ -57,16 +57,9 @@ function main() {
                         for (let k = 0; k < 9; ++k) {
                             let td = document.createElement("td")
                             td.classList.add("cell")
+                            td.textContent = result.solution[3 * i + j][k]
                             tr.appendChild(td)
                         }
-                    }
-                }
-                
-                let result_rows = document.getElementsByClassName("row_result")
-                for (let i = 0; i < result_rows.length; ++i) {
-                    let cells = result_rows[i].getElementsByClassName("cell")
-                    for (let j = 0; j < cells.length; ++j) {
-                        cells[j].textContent = result.solution[i][j]
                     }
                 }
             }
