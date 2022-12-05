@@ -8,7 +8,7 @@ class Solver:
             self.sudoku_cp.append(row.copy())
 
 
-    def check_row(self, row, column):
+    def _check_row(self, row, column):
         count = 0
         for val in self.sudoku_table[row]:
             if val == self.sudoku_table[row][column]:
@@ -16,7 +16,7 @@ class Solver:
         
         return count == 1
 
-    def check_column(self, row, column):
+    def _check_column(self, row, column):
         count = 0
         for i in range(self.DIMENSION):
             if self.sudoku_table[i][column] == self.sudoku_table[row][column]:
@@ -24,7 +24,7 @@ class Solver:
         
         return count == 1
 
-    def check_square(self, row, column):
+    def _check_square(self, row, column):
         count = 0
         row_begin = (row // 3) * 3
         column_begin = (column // 3) * 3
@@ -36,20 +36,20 @@ class Solver:
 
         return count == 1  
 
-    def is_position_correct(self, row, column):
-        return self.check_row(row, column) and \
-               self.check_column(row, column) and \
-               self.check_square(row, column)
+    def _is_position_correct(self, row, column):
+        return self._check_row(row, column) and \
+               self._check_column(row, column) and \
+               self._check_square(row, column)
 
-    def set_position_value(self, row, column):
+    def _set_position_value(self, row, column):
         for i in range(self.sudoku_table[row][column] + 1, self.DIMENSION + 1):
             self.sudoku_table[row][column] = i
-            if self.is_position_correct(row, column):
+            if self._is_position_correct(row, column):
                 return 
         
         self.sudoku_table[row][column] = 0
 
-    def get_last_empty_position(self, row, column):
+    def _get_last_empty_position(self, row, column):
         column -= 1
         while row >= 0:
             while column >= 0:
@@ -68,12 +68,12 @@ class Solver:
             j = 0
             while j < self.DIMENSION:
                 while self.sudoku_table[i][j] == 0:
-                    self.set_position_value(i, j)
+                    self._set_position_value(i, j)
                     while self.sudoku_table[i][j] == 0:
-                        i, j = self.get_last_empty_position(i, j)
+                        i, j = self._get_last_empty_position(i, j)
                         if i < 0 or j < 0:
                             return False
-                        self.set_position_value(i, j)
+                        self._set_position_value(i, j)
                 j += 1
             i += 1
 
