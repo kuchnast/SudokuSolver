@@ -10,7 +10,7 @@
 
 <body>
     <table>
-        <caption>Input sudoku</caption>
+        <caption>Input</caption>
         <colgroup><col><col><col></colgroup>
         <colgroup><col><col><col></colgroup>
         <colgroup><col><col><col></colgroup>
@@ -19,7 +19,7 @@
                 {% for j in range(3) %}
                     <tr class="row">
                         {% for k in range(9) %}
-                            <td><input class="cell" type="text" maxlength="1"></td>
+                            <td><input class="cell cell_input" type="text" maxlength="1"></td>
                         {% endfor %}
                     </tr>
                 {% endfor %}
@@ -27,9 +27,13 @@
         {% endfor %}
     </table>
 
-    <span>
+    <div id="buttons_container">
     <input id="solve_btn" type="button" value="Solve">
     <input id="clear_btn" type="button" value="Clear">
-    </span>
+    </div>
+
+    <div id="result_div">
+
+    </div>
 </body>
 </html>

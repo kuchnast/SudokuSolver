@@ -10,12 +10,11 @@ def index():
 
 @app.route('/solve', methods=['POST'])
 def solve():
-    print("solving")
     sudoku_table = request.get_json()
     if solver.solve(sudoku_table):
-        return jsonify({"result": sudoku_table})
+        return jsonify({"solution": sudoku_table})
     else:
-        return jsonify({"result": "fail"})
+        return jsonify({"solution": "fail"})
 
 
 if __name__ == "__main__":

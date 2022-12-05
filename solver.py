@@ -67,8 +67,10 @@ def solve(sudoku_table):
                 set_position_value(sudoku_table, i, j)
                 while sudoku_table[i][j] == 0:
                     i, j = get_last_empty_position(sudoku_cp, i, j)
-                    set_position_value(sudoku_table, i, j)
                     if i < 0 or j < 0:
                         return False
+                    set_position_value(sudoku_table, i, j)
             j += 1
         i += 1
+
+    return True
