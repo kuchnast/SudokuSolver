@@ -4,6 +4,7 @@
 <head>
   <title>Sudoku</title>
   <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script src="{{url_for('static', filename='script.js')}}" async type="module"></script>
 </head>
 
@@ -16,7 +17,7 @@
         {% for i in range(3) %}
             <tbody>
                 {% for j in range(3) %}
-                    <tr>
+                    <tr class="row">
                         {% for k in range(9) %}
                             <td><input class="cell" type="text" maxlength="1"></td>
                         {% endfor %}
@@ -26,6 +27,9 @@
         {% endfor %}
     </table>
 
+    <span>
     <input id="solve_btn" type="button" value="Solve">
+    <input id="clear_btn" type="button" value="Clear">
+    </span>
 </body>
 </html>

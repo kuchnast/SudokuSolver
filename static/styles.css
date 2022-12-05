@@ -34,3 +34,12 @@ td {
     border-radius: .3em;
     font-weight: bold; */
 }
+
+#clear_btn {
+    height: 50px;
+    width: 100px;
+    text-align: center;
+    font-size: 30px;
+    display: block;
+    margin: 10px auto 0 auto;
+}
