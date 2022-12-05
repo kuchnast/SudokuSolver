@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Sudoku</title>
+  <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}">
+  <script src="{{url_for('static', filename='script.js')}}" async type="module"></script>
+</head>
+
+<body>
+    <table>
+        <caption>Input sudoku</caption>
+        <colgroup><col><col><col></colgroup>
+        <colgroup><col><col><col></colgroup>
+        <colgroup><col><col><col></colgroup>
+        {% for i in range(3) %}
+            <tbody>
+                {% for j in range(3) %}
+                    <tr>
+                        {% for k in range(9) %}
+                            <td><input class="cell" type="text" maxlength="1"></td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        {% endfor %}
+    </table>
+
+    <input id="solve_btn" type="button" value="Solve">
+</body>
+</html>

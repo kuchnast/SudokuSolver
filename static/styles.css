@@ -1,0 +1,36 @@
+table {
+    border-collapse: collapse;
+    font-family: Calibri, sans-serif;
+    margin: 0 auto;
+}
+
+colgroup, tbody {
+    border: solid medium;
+}
+
+td {
+    border: solid thin;
+}
+
+.cell {
+    border: none;
+    height: 30px;
+    width: 30px;
+    text-align: center;
+    font-size: 20px;
+}
+
+#solve_btn {
+    height: 50px;
+    width: 100px;
+    text-align: center;
+    font-size: 30px;
+    display: block;
+    margin: 40px auto 0 auto;
+    
+    /* color: white;
+    background-color: #56CCF2;
+    border: none;
+    border-radius: .3em;
+    font-weight: bold; */
+}
