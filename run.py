@@ -19,7 +19,8 @@ def solve():
 
 @app.route('/scan_image', methods=['POST'])
 def scan_image():
-    board = processing.get_digits_from_img("imageprocessing/sudoku1.jpg")
+    board_name = input("Input sudoku board:")
+    board = processing.get_digits_from_img("imageprocessing/" + board_name)
     return jsonify({"board": board})
 
 

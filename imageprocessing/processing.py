@@ -7,21 +7,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorflow.keras.models import load_model
 import imutils
 
-classes = np.arange(0, 10)
 model = load_model('imageprocessing/model-OCR.h5')
 input_size = 48
 
-
-def get_perspective(img, location, height = 900, width = 900):
-    """Takes an image and location os interested region.
-        And return the only the selected region with a perspective transformation"""
-    pts1 = np.float32([location[0], location[3], location[1], location[2]])
-    pts2 = np.float32([[0, 0], [width, 0], [0, height], [width, height]])
-
-    # Apply Perspective Transform Algorithm
-    matrix = cv2.getPerspectiveTransform(pts1, pts2)
-    result = cv2.warpPerspective(img, matrix, (width, height))
-    return result
 
 def find_board(img):
     """Takes an image as input and finds a sudoku board inside of the image"""
@@ -40,7 +28,10 @@ def find_board(img):
         if len(approx) == 4:
             location = approx
             break
-    result = get_perspective(img, location)
+    
+    result = imutils.perspective.four_point_transform(img, location.reshape(4, 2))
+    result = cv2.resize(result, (900, 900), interpolation=cv2.INTER_CUBIC)
+
     return result
 
 # split the board into 81 individual images
@@ -59,7 +50,6 @@ def split_boxes(board):
 
 def get_digits_from_img(img_name):
     img = cv2.imread(img_name)
-
     board = find_board(img)
 
     gray = cv2.cvtColor(board, cv2.COLOR_BGR2GRAY)
@@ -69,9 +59,8 @@ def get_digits_from_img(img_name):
     prediction = model.predict(rois)
 
     predicted_numbers = []
-    for i in prediction: 
-        index = (np.argmax(i))
-        predicted_number = int(classes[index])
+    for pred in prediction: 
+        predicted_number = int(pred.argmax())
         predicted_numbers.append(predicted_number)
 
     return predicted_numbers
