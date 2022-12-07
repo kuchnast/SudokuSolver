@@ -16,7 +16,6 @@ function main() {
     $("#solve_btn").click(() => {
         hide_result_board()
 
-        const DIMENSION = 9
         var data_table = []
         for (let i = 0; i < rows.length; ++i) {
             data_table.push([])

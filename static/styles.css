@@ -23,22 +23,24 @@ td {
     border: none;
 }
 
-#solve_btn {
+.btn {
     height: 50px;
     width: 100px;
     text-align: center;
     font-size: 30px;
     display: inline-block;
-    margin: 20px 50px 0 0;
+}
+
+#solve_btn {
+    margin: 20px 10px 0 0;
+}
+
+#scan_btn {
+    margin: 20px 0 0 0;
 }
 
 #clear_btn {
-    height: 50px;
-    width: 100px;
-    text-align: center;
-    font-size: 30px;
-    display: inline-block;
-    margin: 20px 0 0 50px;
+    margin: 20px 0 0 10px;
 }
 
 #buttons_container {
