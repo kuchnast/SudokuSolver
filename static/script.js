@@ -65,12 +65,26 @@ function main() {
         })
     })
 
-    var cells = document.getElementsByClassName("cell_input")
+    var cells_input = document.getElementsByClassName("cell_input")
     $("#clear_btn").click(() => {
         hide_result_board()
-        for (let i = 0; i < cells.length; ++i) {
-            cells[i].value = ''
+        for (let i = 0; i < cells_input.length; ++i) {
+            cells_input[i].value = ''
         }
+    })
+
+    $('#scan_btn').click(() => {
+        $.ajax({
+            type: "POST",
+            url: "/scan_image",
+            dataType: "json",
+            success: (result) => {
+                hide_result_board()
+                for (let i = 0; i < cells_input.length; ++i) {
+                    cells_input[i].value = (result.board[i] !== 0) ? result.board[i] : '' 
+                }
+            }
+        })
     })
 }
 
