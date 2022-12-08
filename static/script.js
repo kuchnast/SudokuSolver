@@ -73,15 +73,27 @@ function main() {
         }
     })
 
-    $('#scan_btn').click(() => {
+    $('#file_input').change((event) => {
+        let formData = new FormData()
+        formData.append("image", event.target.files[0])
+
         $.ajax({
             type: "POST",
-            url: "/scan_image",
+            url: "/process_image",
+            contentType: false,
+            cache: false,
+            processData: false,
+            data: formData,
             dataType: "json",
             success: (result) => {
                 hide_result_board()
+                if (result.result === "fail") {
+                    alert("Processing image failed. Could no find a sudoku board.")
+                    return
+                }
+
                 for (let i = 0; i < cells_input.length; ++i) {
-                    cells_input[i].value = (result.board[i] !== 0) ? result.board[i] : '' 
+                    cells_input[i].value = (result.result[i] !== 0) ? result.result[i] : '' 
                 }
             }
         })

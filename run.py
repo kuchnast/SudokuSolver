@@ -14,14 +14,17 @@ def solve():
     solv = Solver(request.get_json())
     if solv.solve():
         return jsonify({"solution": solv.sudoku_table})
-    else:
-        return jsonify({"solution": "fail"})
 
-@app.route('/scan_image', methods=['POST'])
+    return jsonify({"solution": "fail"})
+
+@app.route('/process_image', methods=['POST'])
 def scan_image():
-    board_name = input("Input sudoku board:")
-    board = processing.get_digits_from_img("imageprocessing/" + board_name)
-    return jsonify({"board": board})
+    img_file = request.files.get("image")
+    board = processing.get_digits_from_img(img_file)
+    if len(board) > 0:
+        return jsonify({"result": board})
+
+    return jsonify({"result": "fail"})
 
 
 if __name__ == "__main__":

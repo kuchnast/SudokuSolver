@@ -6,6 +6,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorflow.keras.models import load_model
 import imutils
+import imutils.perspective
 
 model = load_model('imageprocessing/model-OCR.h5')
 input_size = 48
@@ -19,20 +20,20 @@ def find_board(img):
     keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     contours  = imutils.grab_contours(keypoints)
 
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:15]
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)
     location = None
     
     # Finds rectangular contour
     for contour in contours:
-        approx = cv2.approxPolyDP(contour, 15, True)
+        peri = cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, peri * 0.01, True)
         if len(approx) == 4:
             location = approx
-            break
+            result = imutils.perspective.four_point_transform(img, location.reshape(4, 2))
+            result = cv2.resize(result, (900, 900), interpolation=cv2.INTER_CUBIC)
+            return result
     
-    result = imutils.perspective.four_point_transform(img, location.reshape(4, 2))
-    result = cv2.resize(result, (900, 900), interpolation=cv2.INTER_CUBIC)
-
-    return result
+    return []
 
 # split the board into 81 individual images
 def split_boxes(board):
@@ -48,9 +49,13 @@ def split_boxes(board):
 
     return boxes
 
-def get_digits_from_img(img_name):
-    img = cv2.imread(img_name)
+def get_digits_from_img(img_file):
+    file_bytes = np.frombuffer(img_file.read(), np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+
     board = find_board(img)
+    if len(board) == 0:
+        return board
 
     gray = cv2.cvtColor(board, cv2.COLOR_BGR2GRAY)
     rois = split_boxes(gray)
