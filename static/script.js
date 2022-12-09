@@ -5,6 +5,8 @@ if (document.readyState == "loading") {
 }
 
 function main() {
+    listen_arrow_presses()
+
     $(".cell").change((event) => {
         if ((isNaN(event.target.value) && event.target.value !== '') || event.target.value === '0') {
             console.log(event.target.value.length)
@@ -103,4 +105,41 @@ function main() {
 function hide_result_board() {
     let result_div = document.getElementById("result_div")
     result_div.innerHTML = ""
+}
+
+function listen_arrow_presses() {
+    document.addEventListener("keydown", function(event) {
+        var cells_input = Array.from(document.getElementsByClassName("cell_input"))
+        const focus_index = cells_input.findIndex(element => element === document.activeElement)
+        if (focus_index < 0) {
+            return
+        }
+
+        switch (event.key) {
+            case "ArrowUp":
+                if (focus_index >= 9) {
+                    cells_input[focus_index - 9].focus()
+                } else if (focus_index > 0) {
+                    cells_input[focus_index + cells_input.length - 10].focus()
+                }
+                break;
+            case "ArrowRight":
+                if (focus_index < cells_input.length - 1) {
+                    cells_input[focus_index + 1].focus()
+                }
+                break;
+            case "ArrowDown":
+                if (focus_index < cells_input.length - 9) {
+                    cells_input[focus_index + 9].focus()
+                } else if (focus_index < cells_input.length - 1) {
+                    cells_input[focus_index - (cells_input.length - 10)].focus()
+                }
+                break;
+            case "ArrowLeft":
+                if (focus_index > 0) {
+                    cells_input[focus_index - 1].focus()
+                }
+                break;
+        }
+    })
 }
