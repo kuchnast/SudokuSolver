@@ -75,9 +75,11 @@ function main() {
         }
     })
 
+    var loader = document.getElementById("loader")
     $('#file_input').change((event) => {
         let formData = new FormData()
         formData.append("image", event.target.files[0])
+        loader.style.display = 'block'
 
         $.ajax({
             type: "POST",
@@ -90,13 +92,19 @@ function main() {
             success: (result) => {
                 hide_result_board()
                 if (result.result === "fail") {
-                    alert("Processing image failed. Could no find a sudoku board.")
+                    alert("Processing image failed. Could not find a sudoku board.")
                     return
                 }
 
                 for (let i = 0; i < cells_input.length; ++i) {
                     cells_input[i].value = (result.result[i] !== 0) ? result.result[i] : '' 
                 }
+
+                loader.style.display = 'none'
+            },
+            error: () => {
+                loader.style.display = 'none'
+                alert("Http request failed")
             }
         })
     })

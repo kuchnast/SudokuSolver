@@ -30,9 +30,11 @@
     <div id="buttons_container">
     <input id="solve_btn" class="btn" type="button" value="Solve">
     <input id="scan_btn" class="btn" type="button" value="Scan photo" onclick="$('#file_input').click();">
-    <input id="file_input" type="file" style="display:none">
+    <input id="file_input" type="file" style="display:none" onclick="this.value=null;">
     <input id="clear_btn" class="btn" type="button" value="Clear">
     </div>
+
+    <div id="loader"></div> 
 
     <div id="result_div">
 
