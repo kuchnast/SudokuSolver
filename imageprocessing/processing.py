@@ -53,6 +53,15 @@ def get_digits_from_img(img_file):
     file_bytes = np.frombuffer(img_file.read(), np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
 
+    MAX_DIMENSION = 1000
+    if img.shape[0] > MAX_DIMENSION or img.shape[1] > MAX_DIMENSION:
+        height = img.shape[0]
+        width = img.shape[1]
+        proportion = height / width
+        height = MAX_DIMENSION
+        width = round(height / proportion)
+        img = cv2.resize(img, (width, height))
+
     board = find_board(img)
     if len(board) == 0:
         return board
