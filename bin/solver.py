@@ -1,5 +1,6 @@
 class Solver:
     DIMENSION = 9
+
     def __init__(self, sudoku_table):
         self.sudoku_table = sudoku_table
         self.sudoku_cp = []
@@ -31,16 +32,15 @@ class Solver:
             for j in range(self.DIMENSION):
                 if self.sudoku_table[i][j] != 0 and not self._is_position_correct(i, j):
                     return False
-        
-        return True
 
+        return True
 
     def _check_row(self, row, column):
         count = 0
         for val in self.sudoku_table[row]:
             if val == self.sudoku_table[row][column]:
                 count += 1
-        
+
         return count == 1
 
     def _check_column(self, row, column):
@@ -48,7 +48,7 @@ class Solver:
         for i in range(self.DIMENSION):
             if self.sudoku_table[i][column] == self.sudoku_table[row][column]:
                 count += 1
-        
+
         return count == 1
 
     def _check_square(self, row, column):
@@ -61,19 +61,17 @@ class Solver:
                 if self.sudoku_table[i][j] == self.sudoku_table[row][column]:
                     count += 1
 
-        return count == 1  
+        return count == 1
 
     def _is_position_correct(self, row, column):
-        return self._check_row(row, column) and \
-               self._check_column(row, column) and \
-               self._check_square(row, column)
+        return self._check_row(row, column) and self._check_column(row, column) and self._check_square(row, column)
 
     def _set_position_value(self, row, column):
         for i in range(self.sudoku_table[row][column] + 1, self.DIMENSION + 1):
             self.sudoku_table[row][column] = i
             if self._is_position_correct(row, column):
-                return 
-        
+                return
+
         self.sudoku_table[row][column] = 0
 
     def _get_last_empty_position(self, row, column):

@@ -1,26 +1,26 @@
 import cv2
 import numpy as np
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from tensorflow.keras.models import load_model
 import imutils
 import imutils.perspective
 
-model = load_model('imageprocessing/model-OCR.h5')
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+
+model = load_model("bin/imageprocessing/model-OCR.h5")
 input_size = 48
 
 
 def find_board(img):
-    """Takes an image as input and finds a sudoku board inside of the image"""
+    """ Take an image as input and find a sudoku board inside the image."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     bfilter = cv2.bilateralFilter(gray, 13, 20, 20)
     edged = cv2.Canny(bfilter, 30, 180)
     keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contours  = imutils.grab_contours(keypoints)
+    contours = imutils.grab_contours(keypoints)
 
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
-    location = None
-    
+
     # Finds rectangular contour
     for contour in contours:
         peri = cv2.arcLength(contour, True)
@@ -30,13 +30,17 @@ def find_board(img):
             result = imutils.perspective.four_point_transform(img, location.reshape(4, 2))
             result = cv2.resize(result, (900, 900), interpolation=cv2.INTER_CUBIC)
             return result
-    
+
     return []
+
 
 # split the board into 81 individual images
 def split_boxes(board):
-    """Takes a sudoku board and split it into 81 cells. 
-        each cell contains an element of that board either given or an empty cell."""
+    """
+    Take a sudoku board and split it into 81 cells.
+
+    Each cell contains an element of that board either given or an empty cell.
+    """
     rows = np.vsplit(board, 9)
     boxes = []
     for r in rows:
@@ -47,16 +51,17 @@ def split_boxes(board):
 
     return boxes
 
+
 def get_digits_from_img(img_file):
     file_bytes = np.frombuffer(img_file.read(), np.uint8)
     img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
 
-    MAX_DIMENSION = 1000
-    if img.shape[0] > MAX_DIMENSION or img.shape[1] > MAX_DIMENSION:
+    max_dimension = 1000
+    if img.shape[0] > max_dimension or img.shape[1] > max_dimension:
         height = img.shape[0]
         width = img.shape[1]
         proportion = height / width
-        height = MAX_DIMENSION
+        height = max_dimension
         width = round(height / proportion)
         img = cv2.resize(img, (width, height))
 
@@ -71,7 +76,7 @@ def get_digits_from_img(img_file):
     prediction = model.predict(rois)
 
     predicted_numbers = []
-    for pred in prediction: 
+    for pred in prediction:
         predicted_number = int(pred.argmax())
         predicted_numbers.append(predicted_number)
 
