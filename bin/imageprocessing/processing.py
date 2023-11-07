@@ -1,22 +1,26 @@
 import cv2
 import numpy as np
 import os
-from tensorflow.keras.models import load_model
 import imutils
 import imutils.perspective
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-model = load_model("bin/imageprocessing/model-OCR.h5")
 input_size = 48
 
 
 def find_board(img):
     """ Take an image as input and find a sudoku board inside the image."""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    cv2.imwrite("data/1_gray.png", gray)
     bfilter = cv2.bilateralFilter(gray, 13, 20, 20)
+    cv2.imwrite("data/2_bilateralFilter.png", bfilter)
     edged = cv2.Canny(bfilter, 30, 180)
+    cv2.imwrite("data/canny.png", edged)
     keypoints = cv2.findContours(edged.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # test2 = np.zeros(img.shape, dtype=np.uint8)
+    # cv2.drawContours(test2, keypoints, -1, (255,255,255),1)
+    # cv2.imwrite("data/test2.png", test2)
     contours = imutils.grab_contours(keypoints)
 
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
@@ -29,6 +33,7 @@ def find_board(img):
             location = approx
             result = imutils.perspective.four_point_transform(img, location.reshape(4, 2))
             result = cv2.resize(result, (900, 900), interpolation=cv2.INTER_CUBIC)
+            cv2.imwrite("data/result.png", result)
             return result
 
     return []
@@ -53,8 +58,11 @@ def split_boxes(board):
 
 
 def get_digits_from_img(img_file):
-    file_bytes = np.frombuffer(img_file.read(), np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+    if isinstance(img_file, str):
+        img = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
+    else:
+        file_bytes = np.frombuffer(img_file.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
 
     max_dimension = 1000
     if img.shape[0] > max_dimension or img.shape[1] > max_dimension:
@@ -81,3 +89,7 @@ def get_digits_from_img(img_file):
         predicted_numbers.append(predicted_number)
 
     return predicted_numbers
+
+
+if __name__ == "__main__":
+    get_digits_from_img("data/sudoku1.jpg")
