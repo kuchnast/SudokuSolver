@@ -133,4 +133,4 @@ dmypy.json
 .tox/
 .idea/
 _version.py
-
+data/debug*
