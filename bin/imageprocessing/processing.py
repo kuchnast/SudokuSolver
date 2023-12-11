@@ -159,10 +159,41 @@ def get_digits_from_image(image_or_path):
 
     cells = _split_boxes(gray_board)
     cells = _split_boxes_enchanted(gray_board)
+    labels = []
 
-    # TODO: Add digits recognition from cells
+    for cell in cells:
+        if _contains_digit(cell):
+            labels.append('Y')
+        else:
+            labels.append('N')
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/cells_with_labels').mkdir(parents=True, exist_ok=True)
+        for i in range(len(cells)):
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/cells_with_labels/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}_{labels[i]}.png",
+                        cells[i])
+
+    # TODO: Add digits recognition from cells, cieniowanie histogram of gaussians
 
     return None
+
+
+def _contains_digit(cell, threshold=0.05):
+    total_pixels = cell.size
+    black_pixels = np.sum(cell == 0)
+
+    ratio = black_pixels / total_pixels
+
+    return ratio > threshold
+
+
+def _find_digit(cell):
+    contours, _ = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    if DEBUG:
+        contour_image = np.zeros_like(cell)
+        cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 2)
+        cv2.imwrite(f'{DEBUG_DATA_DIR}/test.png', cell)
 
 
 if __name__ == "__main__":
