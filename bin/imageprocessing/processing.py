@@ -4,6 +4,7 @@ import os
 import imutils
 import imutils.perspective
 from pathlib import Path
+import shutil
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -71,15 +72,15 @@ def _split_boxes(board):
 def _split_boxes_enchanted(board):
     cells = _split_cells_without_lines(board)
     if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/split_boxes_enchanted_cells').mkdir(parents=True, exist_ok=True)
+        Path(f'{DEBUG_DATA_DIR}/7_split_boxes_enchanted_cells').mkdir(parents=True, exist_ok=True)
         for i in range(len(cells)):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/split_boxes_enchanted_cells/cell_{i}.png", cells[i])
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/7_split_boxes_enchanted_cells/cell_{i}.png", cells[i])
 
     filtered_cells = _filter_cells(cells)
     if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/split_boxes_enchanted_filtered').mkdir(parents=True, exist_ok=True)
+        Path(f'{DEBUG_DATA_DIR}/8_split_boxes_enchanted_filtered').mkdir(parents=True, exist_ok=True)
         for i in range(len(filtered_cells)):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/split_boxes_enchanted_filtered/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}.png",
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/8_split_boxes_enchanted_filtered/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}.png",
                         filtered_cells[i])
 
     if len(filtered_cells) != 81:
@@ -105,7 +106,7 @@ def _split_cells_without_lines(board):
     if DEBUG:
         contour_image = np.zeros_like(board)
         cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 2)
-        cv2.imwrite(f'{DEBUG_DATA_DIR}/split_cells_without_lines.png', binary)
+        cv2.imwrite(f'{DEBUG_DATA_DIR}/6_split_cells_without_lines.png', binary)
 
     # Split board on rectangular boxes
     cells = []
@@ -157,28 +158,83 @@ def get_digits_from_image(image_or_path):
     if DEBUG:
         cv2.imwrite(f"{DEBUG_DATA_DIR}/5_gray_board.png", gray_board)
 
-    cells = _split_boxes(gray_board)
+    # cells = _split_boxes(gray_board)
     cells = _split_boxes_enchanted(gray_board)
+
+    if cells is None:
+        return None
+
     labels = []
 
-    for cell in cells:
+    cleared_cells = [_clear_cell_noise(cell) for cell in cells]
+
+    for index, cell in enumerate(cleared_cells):
         if _contains_digit(cell):
-            labels.append('Y')
+            labels.append(f'{index}_Y')
         else:
-            labels.append('N')
+            labels.append(f'{index}_N')
 
     if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/cells_with_labels').mkdir(parents=True, exist_ok=True)
-        for i in range(len(cells)):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/cells_with_labels/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}_{labels[i]}.png",
-                        cells[i])
+        Path(f'{DEBUG_DATA_DIR}/9_cells_with_labels').mkdir(parents=True, exist_ok=True)
+        for index, cell in enumerate(cleared_cells):
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/9_cells_with_labels/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_{labels[index][-1]}.png", cell)
 
-    # TODO: Add digits recognition from cells, cieniowanie histogram of gaussians
+    cropped_digits = [(index, _crop_digit(cell)) for index, (label, cell) in enumerate(zip(labels, cleared_cells))
+                      if label[-1] == 'Y']
 
-    return None
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/10_cropped_digits').mkdir(parents=True, exist_ok=True)
+        for index, cell in cropped_digits:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/10_cropped_digits/"
+                        f"d{index}.png", cell)
+
+    recognized_digits = [(index, digit_img, _find_digit(digit_img, 'data/digit_templates'))
+                         for index, digit_img in cropped_digits]
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits').mkdir(parents=True, exist_ok=True)
+        for index, digit_img, digit in recognized_digits:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
+
+    board = _create_sudoku_board(recognized_digits)
+
+    if DEBUG:
+        print_sudoku_board(board)
+
+    return board
 
 
-def _contains_digit(cell, threshold=0.05):
+def print_sudoku_board(board):
+    print("┌───────┬───────┬───────┐")
+
+    for i, row in enumerate(board):
+        print("│ ", end="")
+        for j, cell in enumerate(row):
+            print(cell if cell is not None else " ", end=" ")
+            if (j + 1) % 3 == 0 and j < 8:
+                print("│ ", end="")
+        print("│")
+
+        if (i + 1) % 3 == 0 and i < 8:
+            print("├───────┼───────┼───────┤")
+
+    print("└───────┴───────┴───────┘")
+
+
+def _create_sudoku_board(recognized_digits):
+    board = [[None for _ in range(9)] for _ in range(9)]
+
+    for index, image, digit in recognized_digits:
+        row = int(index / 9)
+        col = index % 9
+        board[row][col] = digit
+
+    return board
+
+
+def _contains_digit(cell, threshold=0.02):
     total_pixels = cell.size
     black_pixels = np.sum(cell == 0)
 
@@ -187,18 +243,101 @@ def _contains_digit(cell, threshold=0.05):
     return ratio > threshold
 
 
-def _find_digit(cell):
-    contours, _ = cv2.findContours(cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+def _clear_cell_noise(cell):
+    _, binary_inv = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    contours, hierarchy = cv2.findContours(binary_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    if DEBUG:
-        contour_image = np.zeros_like(cell)
-        cv2.drawContours(contour_image, contours, -1, (255, 255, 255), 2)
-        cv2.imwrite(f'{DEBUG_DATA_DIR}/test.png', cell)
+    height, width = binary_inv.shape
+    border_contours = []
+
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        # If the contour is touching the border, add it to the list to be removed
+        if x <= 1 or y <= 1 or (x + w) >= width - 1 or (y + h) >= height - 1:
+            border_contours.append(cnt)
+
+    # Create a mask with only the border contours
+    border_mask = np.zeros_like(binary_inv)
+    cv2.drawContours(border_mask, border_contours, -1, (255, 255, 255), cv2.FILLED)
+
+    # Use the border mask to remove the border contours from the original inverted binary image
+    digit_cleaned = cv2.bitwise_and(binary_inv, binary_inv, mask=~border_mask)
+
+    # Invert the image back to original form (digit in black)
+    digit_final = cv2.bitwise_not(digit_cleaned)
+
+    return digit_final
+
+
+def _load_digit_templates(templates_dir):
+    templates = {}
+    for filename in os.listdir(templates_dir):
+        if filename.endswith('.png'):
+            digit = int(filename.split('.')[0])
+            template_path = os.path.join(templates_dir, filename)
+            template_img = cv2.imread(template_path, cv2.IMREAD_GRAYSCALE)
+            templates[digit] = template_img
+    return templates
+
+
+def _find_digit(input_img, templates_dir):
+    templates = _load_digit_templates(templates_dir)
+    input_height, input_width = input_img.shape[:2]
+    highest_score = None
+    recognized_digit = None
+
+    for digit, template_img in templates.items():
+        template_height, template_width = template_img.shape[:2]
+
+        # Scale input image to match the template height or width (whichever is closer in aspect ratio)
+        scale = template_height / input_height if (input_height / input_width) < (
+                    template_height / template_width) else template_width / input_width
+        scaled_input_img = cv2.resize(input_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+        # If input image is smaller than template, pad it with white pixels
+        if scaled_input_img.shape[0] < template_height or scaled_input_img.shape[1] < template_width:
+            padded_input_img = np.full_like(template_img, 255)
+            y_offset = (template_height - scaled_input_img.shape[0]) // 2
+            x_offset = (template_width - scaled_input_img.shape[1]) // 2
+            padded_input_img[y_offset:y_offset + scaled_input_img.shape[0],
+            x_offset:x_offset + scaled_input_img.shape[1]] = scaled_input_img
+            comparison_img = padded_input_img
+        else:
+            comparison_img = scaled_input_img
+
+        # Calculate score using template matching
+        result = cv2.matchTemplate(comparison_img, template_img, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, _ = cv2.minMaxLoc(result)
+
+        if highest_score is None or max_val > highest_score:
+            highest_score = max_val
+            recognized_digit = digit
+
+    return recognized_digit
+
+
+def _crop_digit(cell):
+    iverted_cell = cv2.bitwise_not(cell)
+    contours, hierarchy = cv2.findContours(iverted_cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Find the bounding rectangle for the largest contour
+    largest_contour = max(contours, key=cv2.contourArea)
+    x, y, w, h = cv2.boundingRect(iverted_cell)
+
+    # Crop the image to the bounding box
+    cropped_digit = iverted_cell[y:y + h, x:x + w]
+    cropped_digit = cv2.bitwise_not(cropped_digit)
+
+    return cropped_digit
 
 
 if __name__ == "__main__":
     base_debug_dir = DEBUG_DATA_DIR
+
     DEBUG_DATA_DIR = base_debug_dir + '_sudoku1'
+    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
     get_digits_from_image("data/sudoku1.jpg")
+
     DEBUG_DATA_DIR = base_debug_dir + '_sudoku2'
+    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
     get_digits_from_image("data/sudoku2.png")

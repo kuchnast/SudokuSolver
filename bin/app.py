@@ -30,9 +30,10 @@ def solve():
 @app.route("/process_image", methods=["POST"])
 def scan_image():
     img_file = request.files.get("image")
-    board = processing.get_digits_from_img(img_file)
-    if len(board) > 0:
-        return jsonify({"result": board})
+    board = processing.get_digits_from_image(img_file)
+    if board is not None:
+        flat_board = [cell for row in board for cell in row]
+        return jsonify({"result": flat_board})
 
     return jsonify({"result": "fail"})
 
