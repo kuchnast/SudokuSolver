@@ -1,6 +1,8 @@
 from solver import Solver
 from imageprocessing import processing
 import mimetypes
+from typing import List
+import traceback
 
 mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('text/css', '.css')
@@ -30,12 +32,18 @@ def solve():
 @app.route("/process_image", methods=["POST"])
 def scan_image():
     img_file = request.files.get("image")
-    board = processing.get_digits_from_image(img_file)
-    if board is not None:
-        flat_board = [cell for row in board for cell in row]
-        return jsonify({"result": flat_board})
+    error = ''
+    try:
+        board = processing.get_digits_from_image(img_file)
+        if board is not None:
+            flat_board = [cell for row in board for cell in row]
+            return jsonify({"result": flat_board})
+    except Exception as e:
+        error = e.__str__()
+        print(traceback.format_exc())
 
-    return jsonify({"result": "fail"})
+    return jsonify({"result": "fail",
+                    "error": error})
 
 
 def run():

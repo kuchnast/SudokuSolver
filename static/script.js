@@ -92,7 +92,7 @@ function main() {
             success: (result) => {
                 hide_result_board()
                 if (result.result === "fail") {
-                    alert("Processing image failed. Could not find a sudoku board.")
+                    alert("Processing image failed. Error:" + result.error)
                     return
                 }
 

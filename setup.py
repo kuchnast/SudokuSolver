@@ -13,7 +13,8 @@ setuptools.setup(
         "numpy",
         "flask",
         "flask_cors",
-        "scipy"
+        "scipy",
+        "scikit-image"
     ],
     entry_points={'console_scripts':
                   ['start_server = app:run']}

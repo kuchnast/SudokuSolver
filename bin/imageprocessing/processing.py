@@ -5,6 +5,7 @@ import imutils
 import imutils.perspective
 from pathlib import Path
 import shutil
+from skimage.feature import hog
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -80,8 +81,9 @@ def _split_boxes_enchanted(board):
     if DEBUG:
         Path(f'{DEBUG_DATA_DIR}/8_split_boxes_enchanted_filtered').mkdir(parents=True, exist_ok=True)
         for i in range(len(filtered_cells)):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/8_split_boxes_enchanted_filtered/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}.png",
-                        filtered_cells[i])
+            cv2.imwrite(
+                f"{DEBUG_DATA_DIR}/8_split_boxes_enchanted_filtered/cell_r{(int(i / 9) + 1)}_c{(i % 9) + 1}.png",
+                filtered_cells[i])
 
     if len(filtered_cells) != 81:
         if DEBUG:
@@ -129,7 +131,7 @@ def _filter_cells(cells):
         height, width = cell.shape
         aspect_ratio = width / height
 
-        if (1 - aspect_ratio_tolerance) < aspect_ratio < (1 + aspect_ratio_tolerance) and width > 10 and height > 10:
+        if (1 - aspect_ratio_tolerance) < aspect_ratio < (1 + aspect_ratio_tolerance) and width > 50 and height > 50:
             filtered_cells.append(cell)
 
     return filtered_cells
@@ -175,9 +177,9 @@ def get_digits_from_image(image_or_path):
             labels.append(f'{index}_N')
 
     if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/9_cells_with_labels').mkdir(parents=True, exist_ok=True)
+        Path(f'{DEBUG_DATA_DIR}/9_cleared_cells_with_labels').mkdir(parents=True, exist_ok=True)
         for index, cell in enumerate(cleared_cells):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/9_cells_with_labels/"
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/9_cleared_cells_with_labels/"
                         f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_{labels[index][-1]}.png", cell)
 
     cropped_digits = [(index, _crop_digit(cell)) for index, (label, cell) in enumerate(zip(labels, cleared_cells))
@@ -196,6 +198,15 @@ def get_digits_from_image(image_or_path):
         Path(f'{DEBUG_DATA_DIR}/11_recognized_digits').mkdir(parents=True, exist_ok=True)
         for index, digit_img, digit in recognized_digits:
             cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
+
+    recognized_digits_hog = [(index, digit_img, _find_digit(digit_img, 'data/digit_templates'))
+                             for index, digit_img in cropped_digits]
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits_hog').mkdir(parents=True, exist_ok=True)
+        for index, digit_img, digit in recognized_digits_hog:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits_hog/"
                         f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
 
     board = _create_sudoku_board(recognized_digits)
@@ -249,11 +260,16 @@ def _clear_cell_noise(cell):
 
     height, width = binary_inv.shape
     border_contours = []
+    significant_contour_removed = False
 
     for cnt in contours:
         x, y, w, h = cv2.boundingRect(cnt)
         # If the contour is touching the border, add it to the list to be removed
         if x <= 1 or y <= 1 or (x + w) >= width - 1 or (y + h) >= height - 1:
+            # Check if removing this contour would remove a significant part of the image
+            if cv2.contourArea(cnt) > (height * width * 0.05):  # Threshold set to 5% of the image area
+                significant_contour_removed = True
+                continue
             border_contours.append(cnt)
 
     # Create a mask with only the border contours
@@ -261,10 +277,13 @@ def _clear_cell_noise(cell):
     cv2.drawContours(border_mask, border_contours, -1, (255, 255, 255), cv2.FILLED)
 
     # Use the border mask to remove the border contours from the original inverted binary image
-    digit_cleaned = cv2.bitwise_and(binary_inv, binary_inv, mask=~border_mask)
-
-    # Invert the image back to original form (digit in black)
-    digit_final = cv2.bitwise_not(digit_cleaned)
+    if not significant_contour_removed:
+        digit_cleaned = cv2.bitwise_and(binary_inv, binary_inv, mask=~border_mask)
+        # Invert the image back to original form (digit in black)
+        digit_final = cv2.bitwise_not(digit_cleaned)
+    else:
+        # If a significant contour would have been removed, we return the original image
+        digit_final = cell
 
     return digit_final
 
@@ -291,7 +310,7 @@ def _find_digit(input_img, templates_dir):
 
         # Scale input image to match the template height or width (whichever is closer in aspect ratio)
         scale = template_height / input_height if (input_height / input_width) < (
-                    template_height / template_width) else template_width / input_width
+                template_height / template_width) else template_width / input_width
         scaled_input_img = cv2.resize(input_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
         # If input image is smaller than template, pad it with white pixels
@@ -305,12 +324,36 @@ def _find_digit(input_img, templates_dir):
         else:
             comparison_img = scaled_input_img
 
+        # cv2.imwrite(f"{DEBUG_DATA_DIR}/test.png", comparison_img)
+
         # Calculate score using template matching
         result = cv2.matchTemplate(comparison_img, template_img, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, _ = cv2.minMaxLoc(result)
 
         if highest_score is None or max_val > highest_score:
             highest_score = max_val
+            recognized_digit = digit
+
+    return recognized_digit
+
+
+def _find_digit_hog(input_img, templates_dir):
+    # Calculate HOG features for the input image
+    template_images = _load_digit_templates(templates_dir)
+    input_hog = hog(input_img, pixels_per_cell=(14, 14), cells_per_block=(1, 1), visualize=False)
+
+    highest_score = -1
+    recognized_digit = None
+
+    # Compare HOG features of the input image with each template image
+    for digit, template_img in template_images.items():
+        template_hog = hog(template_img, pixels_per_cell=(14, 14), cells_per_block=(1, 1), visualize=False)
+
+        # Calculate the similarity score - in this case, using the dot product
+        score = np.dot(input_hog, template_hog)
+
+        if score > highest_score:
+            highest_score = score
             recognized_digit = digit
 
     return recognized_digit
@@ -333,6 +376,10 @@ def _crop_digit(cell):
 
 if __name__ == "__main__":
     base_debug_dir = DEBUG_DATA_DIR
+
+    DEBUG_DATA_DIR = base_debug_dir + '_sudoku4'
+    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
+    get_digits_from_image("data/sudoku4.png")
 
     DEBUG_DATA_DIR = base_debug_dir + '_sudoku1'
     shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
