@@ -200,7 +200,7 @@ def get_digits_from_image(image_or_path):
             cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits/"
                         f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
 
-    recognized_digits_hog = [(index, digit_img, _find_digit(digit_img, 'data/digit_templates'))
+    recognized_digits_hog = [(index, digit_img, _find_digit_hog(digit_img, 'data/digit_templates'))
                              for index, digit_img in cropped_digits]
 
     if DEBUG:
@@ -338,18 +338,25 @@ def _find_digit(input_img, templates_dir):
 
 
 def _find_digit_hog(input_img, templates_dir):
-    # Calculate HOG features for the input image
+    # Scale the input image to the size of the template images
     template_images = _load_digit_templates(templates_dir)
-    input_hog = hog(input_img, pixels_per_cell=(14, 14), cells_per_block=(1, 1), visualize=False)
+    template_size = next(iter(template_images.values())).shape
+    input_img_resized = cv2.resize(input_img, template_size[::-1], interpolation=cv2.INTER_AREA)
+
+    # Calculate HOG features for the resized input image
+    input_hog = hog(input_img_resized, pixels_per_cell=(14, 14), cells_per_block=(1, 1), visualize=False)
 
     highest_score = -1
     recognized_digit = None
 
     # Compare HOG features of the input image with each template image
     for digit, template_img in template_images.items():
+        # Ensure the template images are also resized to the common size (if not already)
+        if template_img.shape != template_size:
+            template_img = cv2.resize(template_img, template_size[::-1], interpolation=cv2.INTER_AREA)
         template_hog = hog(template_img, pixels_per_cell=(14, 14), cells_per_block=(1, 1), visualize=False)
 
-        # Calculate the similarity score - in this case, using the dot product
+        # Calculate the similarity score using the dot product
         score = np.dot(input_hog, template_hog)
 
         if score > highest_score:
