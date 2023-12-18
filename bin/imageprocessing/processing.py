@@ -10,7 +10,8 @@ from skimage.feature import hog
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 DEBUG = 1
-DEBUG_DATA_DIR = 'data/debug'
+DATA_DIR = 'data'
+DEBUG_DATA_DIR = f'{DATA_DIR}/debug'
 
 
 def _find_board(img):
@@ -137,86 +138,6 @@ def _filter_cells(cells):
     return filtered_cells
 
 
-def get_digits_from_image(image_or_path):
-    if isinstance(image_or_path, str):
-        img = cv2.imread(image_or_path, cv2.IMREAD_UNCHANGED)
-    else:
-        file_bytes = np.frombuffer(image_or_path.read(), np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
-
-    max_dimension = 1000
-    if img.shape[0] > max_dimension or img.shape[1] > max_dimension:
-        height = img.shape[0]
-        width = img.shape[1]
-        proportion = height / width
-        height = max_dimension
-        width = round(height / proportion)
-        img = cv2.resize(img, (width, height))
-
-    board = _find_board(img)
-    if board is None:
-        return None
-    gray_board = cv2.cvtColor(board, cv2.COLOR_BGR2GRAY)
-    if DEBUG:
-        cv2.imwrite(f"{DEBUG_DATA_DIR}/5_gray_board.png", gray_board)
-
-    # cells = _split_boxes(gray_board)
-    cells = _split_boxes_enchanted(gray_board)
-
-    if cells is None:
-        return None
-
-    labels = []
-
-    cleared_cells = [_clear_cell_noise(cell) for cell in cells]
-
-    for index, cell in enumerate(cleared_cells):
-        if _contains_digit(cell):
-            labels.append(f'{index}_Y')
-        else:
-            labels.append(f'{index}_N')
-
-    if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/9_cleared_cells_with_labels').mkdir(parents=True, exist_ok=True)
-        for index, cell in enumerate(cleared_cells):
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/9_cleared_cells_with_labels/"
-                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_{labels[index][-1]}.png", cell)
-
-    cropped_digits = [(index, _crop_digit(cell)) for index, (label, cell) in enumerate(zip(labels, cleared_cells))
-                      if label[-1] == 'Y']
-
-    if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/10_cropped_digits').mkdir(parents=True, exist_ok=True)
-        for index, cell in cropped_digits:
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/10_cropped_digits/"
-                        f"d{index}.png", cell)
-
-    recognized_digits = [(index, digit_img, _find_digit(digit_img, 'data/digit_templates'))
-                         for index, digit_img in cropped_digits]
-
-    if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits').mkdir(parents=True, exist_ok=True)
-        for index, digit_img, digit in recognized_digits:
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits/"
-                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
-
-    recognized_digits_hog = [(index, digit_img, _find_digit_hog(digit_img, 'data/digit_templates'))
-                             for index, digit_img in cropped_digits]
-
-    if DEBUG:
-        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits_hog').mkdir(parents=True, exist_ok=True)
-        for index, digit_img, digit in recognized_digits_hog:
-            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits_hog/"
-                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
-
-    board = _create_sudoku_board(recognized_digits)
-
-    if DEBUG:
-        print_sudoku_board(board)
-
-    return board
-
-
 def print_sudoku_board(board):
     print("┌───────┬───────┬───────┐")
 
@@ -313,21 +234,8 @@ def _find_digit(input_img, templates_dir):
                 template_height / template_width) else template_width / input_width
         scaled_input_img = cv2.resize(input_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
 
-        # If input image is smaller than template, pad it with white pixels
-        if scaled_input_img.shape[0] < template_height or scaled_input_img.shape[1] < template_width:
-            padded_input_img = np.full_like(template_img, 255)
-            y_offset = (template_height - scaled_input_img.shape[0]) // 2
-            x_offset = (template_width - scaled_input_img.shape[1]) // 2
-            padded_input_img[y_offset:y_offset + scaled_input_img.shape[0],
-            x_offset:x_offset + scaled_input_img.shape[1]] = scaled_input_img
-            comparison_img = padded_input_img
-        else:
-            comparison_img = scaled_input_img
-
-        # cv2.imwrite(f"{DEBUG_DATA_DIR}/test.png", comparison_img)
-
         # Calculate score using template matching
-        result = cv2.matchTemplate(comparison_img, template_img, cv2.TM_CCOEFF_NORMED)
+        result = cv2.matchTemplate(scaled_input_img, template_img, cv2.TM_CCOEFF_NORMED)
         _, max_val, _, _ = cv2.minMaxLoc(result)
 
         if highest_score is None or max_val > highest_score:
@@ -338,6 +246,51 @@ def _find_digit(input_img, templates_dir):
 
 
 def _find_digit_hog(input_img, templates_dir):
+    templates = _load_digit_templates(templates_dir)
+    input_height, input_width = input_img.shape[:2]
+    highest_score = None
+    recognized_digit = None
+
+    for digit, template_img in templates.items():
+        template_height, template_width = template_img.shape[:2]
+
+        # Scale input image to match the template height or width (whichever is closer in aspect ratio)
+        scale = template_height / input_height if (input_height / input_width) < (
+                template_height / template_width) else template_width / input_width
+        scaled_input_img = cv2.resize(input_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+        # If input image is smaller than template, pad it with white pixels
+        if scaled_input_img.shape[0] < template_height or scaled_input_img.shape[1] < template_width:
+            padded_input_img = np.full_like(template_img, 255)
+            y_offset = (template_height - scaled_input_img.shape[0]) // 2
+            x_offset = (template_width - scaled_input_img.shape[1]) // 2
+            padded_input_img[y_offset:y_offset + scaled_input_img.shape[0],
+            x_offset:x_offset + scaled_input_img.shape[1]] = scaled_input_img
+            scaled_input_img = padded_input_img
+
+        # If input image is bigger than template, pad template with white pixels
+        if scaled_input_img.shape[0] > template_height or scaled_input_img.shape[1] > template_width:
+            y_offset = (scaled_input_img.shape[0] - template_height) // 2
+            x_offset = (scaled_input_img.shape[1] - template_width) // 2
+            padded_template_img = np.full_like(scaled_input_img, 255)
+            padded_template_img[y_offset:y_offset + template_height, x_offset:x_offset + template_width] = template_img
+            template_img = padded_template_img
+
+        cv2.imwrite(f"{DEBUG_DATA_DIR}/input.png", scaled_input_img)
+        cv2.imwrite(f"{DEBUG_DATA_DIR}/template.png", template_img)
+
+        input_hog = hog(scaled_input_img, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualize=False)
+        template_hog = hog(template_img, pixels_per_cell=(8, 8), cells_per_block=(1, 1), visualize=False)
+
+        # Calculate the similarity score using the dot product
+        score = np.dot(input_hog, template_hog)
+
+        if highest_score is None or score > highest_score:
+            highest_score = score
+            recognized_digit = digit
+
+    return recognized_digit
+
     # Scale the input image to the size of the template images
     template_images = _load_digit_templates(templates_dir)
     template_size = next(iter(template_images.values())).shape
@@ -368,10 +321,8 @@ def _find_digit_hog(input_img, templates_dir):
 
 def _crop_digit(cell):
     iverted_cell = cv2.bitwise_not(cell)
-    contours, hierarchy = cv2.findContours(iverted_cell, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     # Find the bounding rectangle for the largest contour
-    largest_contour = max(contours, key=cv2.contourArea)
     x, y, w, h = cv2.boundingRect(iverted_cell)
 
     # Crop the image to the bounding box
@@ -381,17 +332,100 @@ def _crop_digit(cell):
     return cropped_digit
 
 
-if __name__ == "__main__":
+def get_digits_from_image(image_or_path):
+    if isinstance(image_or_path, str):
+        img = cv2.imread(image_or_path, cv2.IMREAD_UNCHANGED)
+    else:
+        file_bytes = np.frombuffer(image_or_path.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
+
+    max_dimension = 1000
+    if img.shape[0] > max_dimension or img.shape[1] > max_dimension:
+        height = img.shape[0]
+        width = img.shape[1]
+        proportion = height / width
+        height = max_dimension
+        width = round(height / proportion)
+        img = cv2.resize(img, (width, height))
+
+    board = _find_board(img)
+    if board is None:
+        return None
+    gray_board = cv2.cvtColor(board, cv2.COLOR_BGR2GRAY)
+    if DEBUG:
+        cv2.imwrite(f"{DEBUG_DATA_DIR}/5_gray_board.png", gray_board)
+
+    # cells = _split_boxes(gray_board)
+    cells = _split_boxes_enchanted(gray_board)
+
+    if cells is None:
+        return None
+
+    labels = []
+
+    cleared_cells = [_clear_cell_noise(cell) for cell in cells]
+
+    for index, cell in enumerate(cleared_cells):
+        if _contains_digit(cell):
+            labels.append(f'{index}_Y')
+        else:
+            labels.append(f'{index}_N')
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/9_cleared_cells_with_labels').mkdir(parents=True, exist_ok=True)
+        for index, cell in enumerate(cleared_cells):
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/9_cleared_cells_with_labels/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_{labels[index][-1]}.png", cell)
+
+    cropped_digits = [(index, _crop_digit(cell)) for index, (label, cell) in enumerate(zip(labels, cleared_cells))
+                      if label[-1] == 'Y']
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/10_cropped_digits').mkdir(parents=True, exist_ok=True)
+        for index, cell in cropped_digits:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/10_cropped_digits/"
+                        f"d{index}.png", cell)
+
+    recognized_digits = [(index, digit_img, _find_digit(digit_img, 'data/digit_templates'))
+                         for index, digit_img in cropped_digits]
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits').mkdir(parents=True, exist_ok=True)
+        for index, digit_img, digit in recognized_digits:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
+
+    recognized_digits_hog = [(index, digit_img, _find_digit_hog(digit_img, 'data/digit_templates'))
+                             for index, digit_img in cropped_digits]
+
+    if DEBUG:
+        Path(f'{DEBUG_DATA_DIR}/11_recognized_digits_hog').mkdir(parents=True, exist_ok=True)
+        for index, digit_img, digit in recognized_digits_hog:
+            cv2.imwrite(f"{DEBUG_DATA_DIR}/11_recognized_digits_hog/"
+                        f"cell_r{(int(index / 9) + 1)}_c{(index % 9) + 1}_digit_{digit}.png", digit_img)
+
+    board = _create_sudoku_board(recognized_digits)
+
+    if DEBUG:
+        print_sudoku_board(board)
+
+    return board
+
+
+def run_test():
+    def test(file_name: str):
+        print(f"Board for file {file_name}:")
+        global DEBUG_DATA_DIR
+        DEBUG_DATA_DIR = base_debug_dir + f'_{file_name.split(".")[0]}'
+        shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
+        get_digits_from_image(f"{DATA_DIR}/{file_name}")
+
     base_debug_dir = DEBUG_DATA_DIR
+    files = ["sudoku1.jpg", "sudoku2.png", "sudoku3.png", "sudoku4.png"]
 
-    DEBUG_DATA_DIR = base_debug_dir + '_sudoku4'
-    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
-    get_digits_from_image("data/sudoku4.png")
+    for file in files:
+        test(file)
 
-    DEBUG_DATA_DIR = base_debug_dir + '_sudoku1'
-    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
-    get_digits_from_image("data/sudoku1.jpg")
 
-    DEBUG_DATA_DIR = base_debug_dir + '_sudoku2'
-    shutil.rmtree(DEBUG_DATA_DIR, ignore_errors=True)
-    get_digits_from_image("data/sudoku2.png")
+if __name__ == "__main__":
+    run_test()
