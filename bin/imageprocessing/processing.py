@@ -355,7 +355,6 @@ def get_digits_from_image(image_or_path):
     if DEBUG:
         cv2.imwrite(f"{DEBUG_DATA_DIR}/5_gray_board.png", gray_board)
 
-    # cells = _split_boxes(gray_board)
     cells = _split_boxes_enchanted(gray_board)
 
     if cells is None:
